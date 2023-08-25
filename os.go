@@ -7,11 +7,30 @@ import (
 	"path"
 )
 
+func NewOSStore() Interface {
+	return &OSStore{}
+}
+
 type OSStore struct {
 }
 
-func NewOSStore() Interface {
-	return &OSStore{}
+func (s *OSStore) ListPrefix(key string) (keys []string, err error) {
+	fi, err := os.Stat(key)
+	if err != nil {
+		return nil, err
+	}
+	if !fi.IsDir() {
+		keys = append(keys, path.Join(key, fi.Name()))
+		return
+	}
+	files, err := os.ReadDir(key)
+	if err != nil {
+		return nil, err
+	}
+	for _, file := range files {
+		keys = append(keys, path.Join(key, file.Name()))
+	}
+	return
 }
 
 // Stat returns a FileStat for the given key.

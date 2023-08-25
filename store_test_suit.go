@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,6 +24,7 @@ func testAll(t *testing.T, s Interface, testPath string) {
 	t.Run("DownloadReader", testDownloadReader(s, testPath))
 	t.Run("DownloadRangeBytes", testDownloadRangeBytes(s, testPath))
 	t.Run("DownloadRangeReader", testDownloadRangeReader(s, testPath))
+	t.Run("ListPrefix", testListPrefix(s, testPath))
 }
 
 func testExists(s Interface, testPath string) func(t *testing.T) {
@@ -298,5 +300,44 @@ func testDownloadRangeReader(s Interface, testPath string) func(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, value[start:start+size], data)
 		assert.Equal(t, []byte("range"), data)
+	}
+}
+
+func testListPrefix(s Interface, testPath string) func(t *testing.T) {
+	return func(t *testing.T) {
+		dir := path.Join(testPath, "list-prefix")
+
+		// create
+		for i := 0; i < 3; i++ {
+			err := s.UploadData([]byte(strconv.Itoa(i)), path.Join(dir, "file-"+strconv.Itoa(i)))
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		// check
+		keys, err := s.ListPrefix(dir)
+		assert.Nil(t, err)
+		assert.Equal(t, 3, len(keys))
+
+		for i := 0; i < 3; i++ {
+			_, p, _ := GetPathProtocol(path.Join(dir, "file-"+strconv.Itoa(i)))
+			assert.Contains(t, keys, strings.TrimPrefix(p, "/"))
+
+			e, err := s.Exists(path.Join(dir, "file-"+strconv.Itoa(i)))
+			assert.Nil(t, err)
+			assert.True(t, e)
+		}
+
+		//delete directory
+		err = s.DeleteDirectory(dir)
+		assert.Nil(t, err)
+
+		// check
+		for i := 0; i < 3; i++ {
+			e, err := s.Exists(path.Join(dir, "file-"+strconv.Itoa(i)))
+			assert.Nil(t, err)
+			assert.False(t, e)
+		}
 	}
 }

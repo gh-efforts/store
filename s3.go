@@ -131,7 +131,8 @@ func (s *S3Store) DeleteDirectory(dir string) (err error) {
 	start := time.Now()
 	dir = makeSureKeyAsDir(strings.TrimPrefix(dir, "/"))
 	opts := minio.ListObjectsOptions{
-		Prefix: dir,
+		Recursive: true,
+		Prefix:    dir,
 	}
 	log.Debugw("delete directory", "dir", dir)
 	objectsCh := s.client.ListObjects(context.TODO(), s.cfg.Bucket, opts)
@@ -229,6 +230,9 @@ func (s *S3Store) Stat(key string) (FileStat, error) {
 }
 
 func (s *S3Store) DownloadRangeBytes(key string, offset int64, size int64) ([]byte, error) {
+	if s == nil {
+		return nil, S3NotConfigError
+	}
 	start := time.Now()
 	obj, err := s.getObject(key, &offset, &size)
 	if err != nil {
@@ -245,6 +249,9 @@ func (s *S3Store) DownloadRangeBytes(key string, offset int64, size int64) ([]by
 }
 
 func (s *S3Store) DownloadBytes(key string) ([]byte, error) {
+	if s == nil {
+		return nil, S3NotConfigError
+	}
 	start := time.Now()
 	obj, err := s.getObject(key, nil, nil)
 	if err != nil {
@@ -261,11 +268,44 @@ func (s *S3Store) DownloadBytes(key string) ([]byte, error) {
 }
 
 func (s *S3Store) DownloadReader(key string) (io.ReadCloser, error) {
+	if s == nil {
+		return nil, S3NotConfigError
+	}
+	start := time.Now()
+	defer func() {
+		log.Debugw("downloaded reader", "key", key, "took", time.Since(start))
+	}()
 	return s.getObject(key, nil, nil)
 }
 
 func (s *S3Store) DownloadRangeReader(key string, offset int64, size int64) (io.ReadCloser, error) {
+	if s == nil {
+		return nil, S3NotConfigError
+	}
+	start := time.Now()
+	defer func() {
+		log.Debugw("downloaded range reader", "key", key, "offset", offset, "size", size, "took", time.Since(start))
+	}()
 	return s.getObject(key, &offset, &size)
+}
+
+func (s *S3Store) ListPrefix(key string) (keys []string, err error) {
+	if s == nil {
+		return nil, S3NotConfigError
+	}
+	start := time.Now()
+	defer func() {
+		log.Debugw("listed prefix", "key", key, "took", time.Since(start))
+	}()
+	key = strings.TrimPrefix(key, "/")
+	opts := minio.ListObjectsOptions{
+		Prefix:    key,
+		Recursive: true,
+	}
+	for obj := range s.client.ListObjects(context.TODO(), s.cfg.Bucket, opts) {
+		keys = append(keys, obj.Key)
+	}
+	return
 }
 
 func (s *S3Store) getObject(key string, offset *int64, size *int64) (*minio.Object, error) {

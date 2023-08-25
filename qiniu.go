@@ -14,12 +14,6 @@ var (
 	QiniuNotConfigError = fmt.Errorf("qiniu is not configured")
 )
 
-type QiniuStore struct {
-	downloader *operation.Downloader
-	uploader   *operation.Uploader
-	lister     *operation.Lister
-}
-
 func NewQiniuStore(cfgPath string) (Interface, error) {
 	cfg, err := operation.Load(cfgPath)
 	if err != nil {
@@ -30,6 +24,24 @@ func NewQiniuStore(cfgPath string) (Interface, error) {
 		uploader:   operation.NewUploader(cfg),
 		lister:     operation.NewLister(cfg),
 	}, nil
+}
+
+type QiniuStore struct {
+	downloader *operation.Downloader
+	uploader   *operation.Uploader
+	lister     *operation.Lister
+}
+
+func (s *QiniuStore) ListPrefix(key string) ([]string, error) {
+	if s == nil {
+		return nil, QiniuNotConfigError
+	}
+	key = strings.TrimPrefix(key, "/")
+	start := time.Now()
+	defer func() {
+		log.Debugw("list prefix", "key", key, "took", time.Since(start))
+	}()
+	return s.lister.ListPrefix(key), nil
 }
 
 // UploadData upload memory data to Qiniu store.

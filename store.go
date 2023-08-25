@@ -28,6 +28,7 @@ type Interface interface {
 	DownloadReader(key string) (io.ReadCloser, error)
 	DownloadRangeBytes(key string, offset int64, size int64) ([]byte, error)
 	DownloadRangeReader(key string, offset int64, size int64) (io.ReadCloser, error)
+	ListPrefix(key string) ([]string, error)
 }
 
 type FileStat struct {
@@ -68,6 +69,14 @@ type Store struct {
 	osStore    Interface
 	qiniuStore Interface
 	s3Store    Interface
+}
+
+func (s *Store) ListPrefix(key string) ([]string, error) {
+	st, p, err := s.getStoreByKey(key)
+	if err != nil {
+		return nil, err
+	}
+	return st.ListPrefix(p)
 }
 
 func (s *Store) UploadData(data []byte, key string) (err error) {
