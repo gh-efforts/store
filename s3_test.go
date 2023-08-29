@@ -20,7 +20,7 @@ func TestS3Store(t *testing.T) {
 	})
 
 	t.Run("S3Store2", func(t *testing.T) {
-		s, err := NewS3Store(os.Getenv(s3Env))
+		s, err := NewS3Store(os.Getenv(S3Env))
 		if err != nil {
 			t.Fatal(err)
 		}

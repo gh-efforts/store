@@ -11,9 +11,11 @@ import (
 )
 
 var (
-	log      = logger.Logger("store")
-	s3Env    = "S3_STORE_CONFIG"
-	qiniuEnv = "QINIU_STORE_CONFIG"
+	log            = logger.Logger("store")
+	S3Env          = "S3_STORE_CONFIG"
+	S3ReaderEnv    = "S3_READER_CONFIG"
+	QiniuEnv       = "QINIU_STORE_CONFIG"
+	QiniuReaderEnv = "QINIU_READER_CONFIG"
 )
 
 type Interface interface {
@@ -40,7 +42,7 @@ func NewStore(qiniuConfigPath, s3ConfigPath string) (Interface, error) {
 		osStore: NewOSStore(),
 	}
 	if qiniuConfigPath == "" {
-		qiniuConfigPath = os.Getenv(qiniuEnv)
+		qiniuConfigPath = os.Getenv(QiniuEnv)
 		if qiniuConfigPath == "" {
 			qiniuConfigPath = os.Getenv(operation.QINIU_ENV)
 		}
@@ -53,7 +55,7 @@ func NewStore(qiniuConfigPath, s3ConfigPath string) (Interface, error) {
 		store.qiniuStore = st
 	}
 	if s3ConfigPath == "" {
-		s3ConfigPath = os.Getenv(s3Env)
+		s3ConfigPath = os.Getenv(S3Env)
 	}
 	if s3ConfigPath != "" {
 		st, err := NewS3Store(s3ConfigPath)

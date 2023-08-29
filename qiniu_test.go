@@ -20,7 +20,7 @@ func TestQiniuStore(t *testing.T) {
 	})
 
 	t.Run("QiniuStore2", func(t *testing.T) {
-		s, err := NewQiniuStore(os.Getenv(qiniuEnv))
+		s, err := NewQiniuStore(os.Getenv(QiniuEnv))
 		if err != nil {
 			t.Fatal(err)
 		}
