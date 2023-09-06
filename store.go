@@ -38,43 +38,19 @@ type FileStat struct {
 }
 
 func NewStore(qiniuConfigPath, s3ConfigPath string) (Interface, error) {
-	store := &Store{
-		osStore: NewOSStore(),
-	}
-	if qiniuConfigPath == "" {
-		qiniuConfigPath = os.Getenv(QiniuEnv)
-		if qiniuConfigPath == "" {
-			qiniuConfigPath = os.Getenv(operation.QINIU_ENV)
-		}
-	}
-	if qiniuConfigPath != "" {
-		st, err := NewQiniuStore(qiniuConfigPath)
-		if err != nil {
-			return nil, fmt.Errorf("new qiniu store error: %v", err)
-		}
-		store.qiniuStore = st
-	}
-	if s3ConfigPath == "" {
-		s3ConfigPath = os.Getenv(S3Env)
-	}
-	if s3ConfigPath != "" {
-		st, err := NewS3Store(s3ConfigPath)
-		if err != nil {
-			return nil, fmt.Errorf("new s3 store error: %v", err)
-		}
-		store.s3Store = st
-	}
-	return store, nil
+	return newStore(qiniuConfigPath, s3ConfigPath)
 }
 
 type Store struct {
-	osStore    Interface
-	qiniuStore Interface
-	s3Store    Interface
+	osStore          Interface
+	qiniuStore       Interface
+	qiniuReaderStore Interface
+	s3Store          Interface
+	s3ReaderStore    Interface
 }
 
 func (s *Store) ListPrefix(key string) ([]string, error) {
-	st, p, err := s.getStoreByKey(key)
+	st, _, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +58,7 @@ func (s *Store) ListPrefix(key string) ([]string, error) {
 }
 
 func (s *Store) UploadData(data []byte, key string) (err error) {
-	st, p, err := s.getStoreByKey(key)
+	st, _, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return err
 	}
@@ -90,7 +66,7 @@ func (s *Store) UploadData(data []byte, key string) (err error) {
 }
 
 func (s *Store) Upload(file string, key string) (err error) {
-	st, p, err := s.getStoreByKey(key)
+	st, _, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return err
 	}
@@ -98,7 +74,7 @@ func (s *Store) Upload(file string, key string) (err error) {
 }
 
 func (s *Store) UploadReader(reader io.Reader, size int64, key string) (err error) {
-	st, p, err := s.getStoreByKey(key)
+	st, _, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return err
 	}
@@ -106,7 +82,7 @@ func (s *Store) UploadReader(reader io.Reader, size int64, key string) (err erro
 }
 
 func (s *Store) DeleteDirectory(dir string) (err error) {
-	st, p, err := s.getStoreByKey(dir)
+	st, _, p, err := s.getStoreByKey(dir)
 	if err != nil {
 		return err
 	}
@@ -114,7 +90,7 @@ func (s *Store) DeleteDirectory(dir string) (err error) {
 }
 
 func (s *Store) Delete(key string) (err error) {
-	st, p, err := s.getStoreByKey(key)
+	st, _, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return err
 	}
@@ -122,68 +98,177 @@ func (s *Store) Delete(key string) (err error) {
 }
 
 func (s *Store) Exists(key string) (bool, error) {
-	st, p, err := s.getStoreByKey(key)
+	st, rt, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return false, err
 	}
-	return st.Exists(p)
+	if e, err := st.Exists(p); err != nil {
+		return false, err
+	} else if !e && rt != nil {
+		return rt.Exists(p)
+	} else {
+		return e, err
+	}
 }
 
 func (s *Store) Stat(key string) (FileStat, error) {
-	st, p, err := s.getStoreByKey(key)
+	st, rt, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return FileStat{}, err
 	}
-	return st.Stat(p)
+	if fi, err := st.Stat(p); err != nil && rt != nil {
+		return rt.Stat(p)
+	} else {
+		return fi, err
+	}
 }
 
 func (s *Store) DownloadBytes(key string) ([]byte, error) {
-	st, p, err := s.getStoreByKey(key)
+	st, rt, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return nil, err
 	}
-	return st.DownloadBytes(p)
+	if data, err := st.DownloadBytes(p); err != nil && rt != nil {
+		return rt.DownloadBytes(p)
+	} else {
+		return data, err
+	}
 }
 
 func (s *Store) DownloadReader(key string) (io.ReadCloser, error) {
-	st, p, err := s.getStoreByKey(key)
+	st, rt, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return nil, err
 	}
-	return st.DownloadReader(p)
+	if reader, err := st.DownloadReader(p); err != nil && rt != nil {
+		return rt.DownloadReader(p)
+	} else {
+		return reader, err
+	}
 }
 
 func (s *Store) DownloadRangeBytes(key string, offset int64, size int64) ([]byte, error) {
-	st, p, err := s.getStoreByKey(key)
+	st, rt, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return nil, err
 	}
-	return st.DownloadRangeBytes(p, offset, size)
+	if data, err := st.DownloadRangeBytes(p, offset, size); err != nil && rt != nil {
+		return rt.DownloadRangeBytes(p, offset, size)
+	} else {
+		return data, err
+	}
 }
 
 func (s *Store) DownloadRangeReader(key string, offset int64, size int64) (io.ReadCloser, error) {
-	st, p, err := s.getStoreByKey(key)
+	st, rt, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return nil, err
 	}
-	return st.DownloadRangeReader(p, offset, size)
+	if reader, err := st.DownloadRangeReader(p, offset, size); err != nil && rt != nil {
+		return rt.DownloadRangeReader(p, offset, size)
+	} else {
+		return reader, err
+	}
 }
 
-func (s *Store) getStoreByKey(key string) (Interface, string, error) {
+func (s *Store) getStoreByKey(key string) (Interface, Interface, string, error) {
 	pp, p, err := GetPathProtocol(key)
 	if err != nil {
-		return nil, p, err
+		return nil, nil, p, err
 	}
 	switch pp {
 	case QiniuProtocol:
-		return s.qiniuStore, p, nil
+		return s.qiniuStore, s.qiniuReaderStore, p, nil
 	case S3Protocol:
-		return s.s3Store, p, nil
+		return s.s3Store, s.s3ReaderStore, p, nil
 	case OSProtocol:
-		return s.osStore, p, nil
+		return s.osStore, nil, p, nil
 	default:
-		return nil, p, fmt.Errorf("unsupported file path protocol: %s, %s", pp, key)
+		return nil, nil, p, fmt.Errorf("unsupported file path protocol: %s, %s", pp, key)
 	}
+}
+
+func newStore(qiniuConfigPath, s3ConfigPath string) (*Store, error) {
+
+	store := &Store{
+		osStore: NewOSStore(),
+	}
+
+	// qiniu store
+	if qiniuConfigPath == "" {
+		qiniuStore, err := newQiniuFromEnv([]string{
+			QiniuEnv,
+			operation.QINIU_ENV,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("new qiniu store error: %v", err)
+		}
+		store.qiniuStore = qiniuStore
+	} else {
+		qiniuStore, err := NewQiniuStore(qiniuConfigPath)
+		if err != nil {
+			return nil, fmt.Errorf("new qiniu store error: %v", err)
+		}
+		store.qiniuStore = qiniuStore
+	}
+
+	// qiniu reader
+	qiniuReader, err := newQiniuFromEnv([]string{
+		QiniuReaderEnv,
+		"QINIU_READER_CONFIG_PATH",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("new qiniu reader error: %v", err)
+	}
+	store.qiniuReaderStore = qiniuReader
+
+	// s3 store
+	if s3ConfigPath == "" {
+		s3Store, err := newS3FromEnv([]string{
+			S3Env,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("new s3 store error: %v", err)
+		}
+		store.s3Store = s3Store
+	} else {
+		s3Store, err := NewS3Store(s3ConfigPath)
+		if err != nil {
+			return nil, fmt.Errorf("new s3 store error: %v", err)
+		}
+		store.s3Store = s3Store
+	}
+
+	// s3 reader
+	s3Reader, err := newS3FromEnv([]string{
+		S3ReaderEnv,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("new s3 reader error: %v", err)
+	}
+	store.s3ReaderStore = s3Reader
+
+	return store, nil
+}
+
+func newQiniuFromEnv(envs []string) (Interface, error) {
+	for _, env := range envs {
+		val, exists := os.LookupEnv(env)
+		if exists {
+			return NewQiniuStore(val)
+		}
+	}
+	return nil, nil
+}
+
+func newS3FromEnv(envs []string) (Interface, error) {
+	for _, env := range envs {
+		val, exists := os.LookupEnv(env)
+		if exists {
+			return NewS3Store(val)
+		}
+	}
+	return nil, nil
 }
 
 var _ Interface = (*Store)(nil)

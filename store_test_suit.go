@@ -321,8 +321,12 @@ func testListPrefix(s Interface, testPath string) func(t *testing.T) {
 		assert.Equal(t, 3, len(keys))
 
 		for i := 0; i < 3; i++ {
-			_, p, _ := GetPathProtocol(path.Join(dir, "file-"+strconv.Itoa(i)))
-			assert.Contains(t, keys, strings.TrimPrefix(p, "/"))
+			protocol, p, _ := GetPathProtocol(path.Join(dir, "file-"+strconv.Itoa(i)))
+			if protocol == OSProtocol { // os store need keep prefix "/"
+				assert.Contains(t, keys, p)
+			} else {
+				assert.Contains(t, keys, strings.TrimPrefix(p, "/"))
+			}
 
 			e, err := s.Exists(path.Join(dir, "file-"+strconv.Itoa(i)))
 			assert.Nil(t, err)

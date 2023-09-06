@@ -41,9 +41,9 @@ func GetPathProtocol(p string) (PathProtocol, string, error) {
 	}
 	switch u.Scheme {
 	case QiniuProtocol.String():
-		return QiniuProtocol, u.Path, nil
+		return QiniuProtocol, strings.TrimPrefix(u.Path, "/"), nil
 	case S3Protocol.String():
-		return S3Protocol, u.Path, nil
+		return S3Protocol, strings.TrimPrefix(u.Path, "/"), nil
 	case OSProtocol.String():
 		if strings.HasPrefix(u.Path, "/") {
 			return OSProtocol, u.Path, nil
@@ -51,5 +51,20 @@ func GetPathProtocol(p string) (PathProtocol, string, error) {
 		return UnknownProtocol, u.Path, fmt.Errorf("unsupported path: %s", p)
 	default:
 		return UnknownProtocol, u.Path, nil
+	}
+}
+
+func IsUnionPath(p string) bool {
+	protocol, _, err := GetPathProtocol(p)
+	if err != nil {
+		return false
+	}
+	switch protocol {
+	case OSProtocol:
+		// It is not rigorous here, for the sake of simplicity, we think
+		// all supported paths are union path expected os.
+		return false
+	default:
+		return true
 	}
 }
