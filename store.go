@@ -5,9 +5,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/service-sdk/go-sdk-qn/syncdata/operation"
-
 	logger "github.com/ipfs/go-log/v2"
+	"github.com/service-sdk/go-sdk-qn/v2/operation"
 )
 
 var (
