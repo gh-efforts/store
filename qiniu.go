@@ -168,8 +168,8 @@ func (s *QiniuStore) DownloadReader(key string) (io.ReadCloser, error) {
 		log.Debugw("download reader", "key", key, "took", time.Since(start))
 	}()
 	resp, err := s.downloader.DownloadRaw(key, http.Header{})
-	if err != nil {
-		return nil, err
+	if err != nil || resp.StatusCode != 200 {
+		return nil, fmt.Errorf("%d: %s", resp.StatusCode, err)
 	}
 	return resp.Body, nil
 }
