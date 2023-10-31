@@ -213,6 +213,7 @@ func newStore(qiniuConfigPath, s3ConfigPath string) (*Store, error) {
 
 	// qiniu reader
 	qiniuReader, err := newQiniuFromEnv([]string{
+		operation.QINIU_MULTI_CLUSTER_ENV,
 		QiniuReaderEnv,
 		"QINIU_READER_CONFIG_PATH",
 	})
@@ -254,6 +255,9 @@ func newQiniuFromEnv(envs []string) (Interface, error) {
 	for _, env := range envs {
 		val, exists := os.LookupEnv(env)
 		if exists {
+			if env == operation.QINIU_MULTI_CLUSTER_ENV {
+				return NewMultiClusterQiniuStore()
+			}
 			return NewQiniuStore(val)
 		}
 	}

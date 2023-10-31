@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -19,10 +20,24 @@ func NewQiniuStore(cfgPath string) (Interface, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &QiniuStore{
 		downloader: operation.NewDownloader(cfg),
 		uploader:   operation.NewUploader(cfg),
 		lister:     operation.NewLister(cfg),
+	}, nil
+}
+
+// NewMultiClusterQiniuStore initializes a multi-cluster qiniu store,
+// only support QINIU_MULTI_CLUSTER environment variable
+func NewMultiClusterQiniuStore() (Interface, error) {
+	if _, e := os.LookupEnv(operation.QINIU_MULTI_CLUSTER_ENV); !e {
+		return nil, QiniuNotConfigError
+	}
+	return &QiniuStore{
+		downloader: operation.NewDownloaderV2(),
+		uploader:   operation.NewUploaderV2(),
+		lister:     operation.NewListerV2(),
 	}, nil
 }
 
