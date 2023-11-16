@@ -10,7 +10,9 @@ import (
 )
 
 var (
-	log            = logger.Logger("store")
+	log              = logger.Logger("store")
+	ErrNotConfigured = fmt.Errorf("store is not configured")
+
 	S3Env          = "S3_STORE_CONFIG"
 	S3ReaderEnv    = "S3_READER_CONFIG"
 	QiniuEnv       = "QINIU_STORE_CONFIG"
@@ -53,6 +55,9 @@ func (s *Store) ListPrefix(key string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	if st == nil {
+		return nil, ErrNotConfigured
+	}
 	return st.ListPrefix(p)
 }
 
@@ -60,6 +65,9 @@ func (s *Store) UploadData(data []byte, key string) (err error) {
 	st, _, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return err
+	}
+	if st == nil {
+		return ErrNotConfigured
 	}
 	return st.UploadData(data, p)
 }
@@ -69,6 +77,9 @@ func (s *Store) Upload(file string, key string) (err error) {
 	if err != nil {
 		return err
 	}
+	if st == nil {
+		return ErrNotConfigured
+	}
 	return st.Upload(file, p)
 }
 
@@ -76,6 +87,9 @@ func (s *Store) UploadReader(reader io.Reader, size int64, key string) (err erro
 	st, _, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return err
+	}
+	if st == nil {
+		return ErrNotConfigured
 	}
 	return st.UploadReader(reader, size, p)
 }
@@ -85,6 +99,9 @@ func (s *Store) DeleteDirectory(dir string) (err error) {
 	if err != nil {
 		return err
 	}
+	if st == nil {
+		return ErrNotConfigured
+	}
 	return st.DeleteDirectory(p)
 }
 
@@ -92,6 +109,9 @@ func (s *Store) Delete(key string) (err error) {
 	st, _, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return err
+	}
+	if st == nil {
+		return ErrNotConfigured
 	}
 	return st.Delete(p)
 }
@@ -101,73 +121,119 @@ func (s *Store) Exists(key string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if e, err := st.Exists(p); err != nil {
-		return false, err
-	} else if !e && rt != nil {
-		return rt.Exists(p)
-	} else {
-		return e, err
+	var e1, e2 bool
+	if st != nil {
+		if e1, err = st.Exists(p); err != nil {
+			return false, err
+		}
 	}
+	if rt != nil {
+		if e2, err = rt.Exists(p); err != nil {
+			return false, err
+		}
+	}
+	return e1 || e2, nil
 }
 
-func (s *Store) Stat(key string) (FileStat, error) {
+func (s *Store) Stat(key string) (fs FileStat, err error) {
 	st, rt, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return FileStat{}, err
 	}
-	if fi, err := st.Stat(p); err != nil && rt != nil {
-		return rt.Stat(p)
-	} else {
-		return fi, err
+	if st != nil {
+		fs, err = st.Stat(p)
+		if err == nil {
+			return fs, nil
+		}
 	}
+	if rt != nil {
+		fs, err = rt.Stat(p)
+		if err == nil {
+			return fs, nil
+		}
+	}
+	return
 }
 
-func (s *Store) DownloadBytes(key string) ([]byte, error) {
+func (s *Store) DownloadBytes(key string) (data []byte, err error) {
 	st, rt, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return nil, err
 	}
-	if data, err := st.DownloadBytes(p); err != nil && rt != nil {
-		return rt.DownloadBytes(p)
-	} else {
-		return data, err
+	if st != nil {
+		data, err = st.DownloadBytes(p)
+		if err == nil {
+			return data, nil
+		}
 	}
+	if rt != nil {
+		data, err = rt.DownloadBytes(p)
+		if err == nil {
+			return data, nil
+		}
+	}
+	return
 }
 
-func (s *Store) DownloadReader(key string) (io.ReadCloser, error) {
+func (s *Store) DownloadReader(key string) (rc io.ReadCloser, err error) {
 	st, rt, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return nil, err
 	}
-	if reader, err := st.DownloadReader(p); err != nil && rt != nil {
-		return rt.DownloadReader(p)
-	} else {
-		return reader, err
+
+	if st != nil {
+		rc, err = st.DownloadReader(p)
+		if err == nil {
+			return rc, nil
+		}
 	}
+	if rt != nil {
+		rc, err = rt.DownloadReader(p)
+		if err == nil {
+			return rc, nil
+		}
+	}
+	return
 }
 
-func (s *Store) DownloadRangeBytes(key string, offset int64, size int64) ([]byte, error) {
+func (s *Store) DownloadRangeBytes(key string, offset int64, size int64) (data []byte, err error) {
 	st, rt, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return nil, err
 	}
-	if data, err := st.DownloadRangeBytes(p, offset, size); err != nil && rt != nil {
-		return rt.DownloadRangeBytes(p, offset, size)
-	} else {
-		return data, err
+	if st != nil {
+		data, err = st.DownloadRangeBytes(p, offset, size)
+		if err == nil {
+			return data, nil
+		}
 	}
+	if rt != nil {
+		data, err = rt.DownloadRangeBytes(p, offset, size)
+		if err == nil {
+			return data, nil
+		}
+	}
+	return
 }
 
-func (s *Store) DownloadRangeReader(key string, offset int64, size int64) (io.ReadCloser, error) {
+func (s *Store) DownloadRangeReader(key string, offset int64, size int64) (rc io.ReadCloser, err error) {
 	st, rt, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return nil, err
 	}
-	if reader, err := st.DownloadRangeReader(p, offset, size); err != nil && rt != nil {
-		return rt.DownloadRangeReader(p, offset, size)
-	} else {
-		return reader, err
+	if st != nil {
+		rc, err = st.DownloadRangeReader(p, offset, size)
+		if err == nil {
+			return rc, nil
+		}
 	}
+	if rt != nil {
+		rc, err = rt.DownloadRangeReader(p, offset, size)
+		if err == nil {
+			return rc, nil
+		}
+	}
+	return
 }
 
 func (s *Store) getStoreByKey(key string) (Interface, Interface, string, error) {
@@ -177,8 +243,14 @@ func (s *Store) getStoreByKey(key string) (Interface, Interface, string, error) 
 	}
 	switch pp {
 	case QiniuProtocol:
+		if s.qiniuStore == nil && s.qiniuReaderStore == nil {
+			return nil, nil, p, fmt.Errorf("%s %s", pp, ErrNotConfigured)
+		}
 		return s.qiniuStore, s.qiniuReaderStore, p, nil
 	case S3Protocol:
+		if s.s3Store == nil && s.s3ReaderStore == nil {
+			return nil, nil, p, fmt.Errorf("%s %s", pp, ErrNotConfigured)
+		}
 		return s.s3Store, s.s3ReaderStore, p, nil
 	case OSProtocol:
 		return s.osStore, nil, p, nil
