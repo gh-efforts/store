@@ -15,6 +15,15 @@ var (
 	QiniuNotConfigError = fmt.Errorf("qiniu is not configured")
 )
 
+// variables compatible with Qiniu rust sdk
+func init() {
+	if v, e := os.LookupEnv(QiniuEnv); e {
+		if _, qe := os.LookupEnv(operation.QINIU_ENV); !qe {
+			_ = os.Setenv(operation.QINIU_ENV, v)
+		}
+	}
+}
+
 func NewQiniuStore(cfgPath string) (Interface, error) {
 	cfg, err := operation.Load(cfgPath)
 	if err != nil {
