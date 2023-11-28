@@ -6,7 +6,7 @@ require (
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/minio/minio-go/v7 v7.0.63
 	github.com/pelletier/go-toml v1.9.5
-	github.com/service-sdk/go-sdk-qn/v2 v2.0.0
+	github.com/service-sdk/go-sdk-qn/v2 v2.0.1
 	github.com/stretchr/testify v1.8.4
 )
 

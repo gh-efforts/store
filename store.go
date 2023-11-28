@@ -116,26 +116,35 @@ func (s *Store) Delete(key string) (err error) {
 	return st.Delete(p)
 }
 
-func (s *Store) Exists(key string) (bool, error) {
+func (s *Store) Exists(key string) (e bool, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("recover: %v", r)
+		}
+	}()
 	st, rt, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return false, err
 	}
-	var e1, e2 bool
 	if st != nil {
-		if e1, err = st.Exists(p); err != nil {
+		if e1, err := st.Exists(p); err != nil {
 			return false, err
+		} else if e1 {
+			return e1, nil
 		}
 	}
 	if rt != nil {
-		if e2, err = rt.Exists(p); err != nil {
-			return false, err
-		}
+		return rt.Exists(p)
 	}
-	return e1 || e2, nil
+	return false, nil
 }
 
 func (s *Store) Stat(key string) (fs FileStat, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("recover: %v", r)
+		}
+	}()
 	st, rt, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return FileStat{}, err
@@ -156,6 +165,11 @@ func (s *Store) Stat(key string) (fs FileStat, err error) {
 }
 
 func (s *Store) DownloadBytes(key string) (data []byte, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("recover: %v", r)
+		}
+	}()
 	st, rt, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return nil, err
@@ -176,6 +190,11 @@ func (s *Store) DownloadBytes(key string) (data []byte, err error) {
 }
 
 func (s *Store) DownloadReader(key string) (rc io.ReadCloser, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("recover: %v", r)
+		}
+	}()
 	st, rt, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return nil, err
@@ -197,6 +216,11 @@ func (s *Store) DownloadReader(key string) (rc io.ReadCloser, err error) {
 }
 
 func (s *Store) DownloadRangeBytes(key string, offset int64, size int64) (data []byte, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("recover: %v", r)
+		}
+	}()
 	st, rt, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return nil, err
@@ -217,6 +241,11 @@ func (s *Store) DownloadRangeBytes(key string, offset int64, size int64) (data [
 }
 
 func (s *Store) DownloadRangeReader(key string, offset int64, size int64) (rc io.ReadCloser, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("recover: %v", r)
+		}
+	}()
 	st, rt, p, err := s.getStoreByKey(key)
 	if err != nil {
 		return nil, err
