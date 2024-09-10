@@ -149,12 +149,12 @@ func (s *S3Store) DeleteDirectory(dir string) (err error) {
 		}
 
 		info, copyErr := s.client.CopyObject(context.TODO(), dest, src)
-		if err != nil {
+		if copyErr != nil {
 			err = copyErr
 			break
 		}
 		removeErr := s.client.RemoveObject(context.TODO(), src.Bucket, src.Object, minio.RemoveObjectOptions{})
-		if err != nil {
+		if removeErr != nil {
 			err = removeErr
 			break
 		}
@@ -320,7 +320,7 @@ func (s *S3Store) getObject(key string, offset *int64, size *int64) (*minio.Obje
 			start = *offset
 		}
 		if size != nil {
-			end = *offset + *size - 1
+			end = start + *size - 1
 		}
 		if err := opts.SetRange(start, end); err != nil {
 			return nil, fmt.Errorf("set range: %v", err)
