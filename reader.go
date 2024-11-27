@@ -4,6 +4,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/filecoin-project/go-padreader"
+	"github.com/filecoin-project/go-state-types/abi"
+	carv2 "github.com/ipld/go-car/v2"
 )
 
 type Reader struct {
@@ -82,3 +86,65 @@ func (r *Reader) Read(p []byte) (n int, err error) {
 
 	return r.body.Read(p)
 }
+
+type PathReader struct {
+	Path      string
+	PieceSize abi.UnpaddedPieceSize
+	rc        io.ReadCloser
+}
+
+func NewPathReader(path string, pieceSize abi.UnpaddedPieceSize) *PathReader {
+	return &PathReader{Path: path, PieceSize: pieceSize}
+}
+
+func (r *PathReader) Read(p []byte) (n int, err error) {
+	if r.rc == nil {
+		r.rc, err = openReader(r.Path, r.PieceSize)
+		if err != nil {
+			return 0, fmt.Errorf("failed to open reader: %w", err)
+		}
+	}
+	return r.rc.Read(p)
+}
+
+func (r *PathReader) Close() error {
+	if r.rc != nil {
+		return r.rc.Close()
+	}
+	return nil
+}
+
+func openReader(filePath string, pieceSize abi.UnpaddedPieceSize) (io.ReadCloser, error) {
+	st, err := os.Stat(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat %s: %w", filePath, err)
+	}
+	size := uint64(st.Size())
+
+	// Open a reader against the CAR file with the deal data
+	v2r, err := carv2.OpenReader(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open CAR reader over %s: %w", filePath, err)
+	}
+	v2r.Close()
+
+	r, err := os.Open(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open %s: %w", filePath, err)
+	}
+
+	reader, err := padreader.NewInflator(r, size, pieceSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to inflate data: %w", err)
+	}
+
+	return struct {
+		io.Reader
+		io.Closer
+	}{
+		Reader: reader,
+		Closer: r,
+	}, nil
+}
+
+var _ io.ReadCloser = &PathReader{}
